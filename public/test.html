@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FoodSite</title>
+</head>
+<body>
+    <h1>🍔 FoodSite</h1>
+
+    <!-- ====== Tokens ====== -->
+    <p><strong>Customer Token:</strong> <span id="customerToken"></span></p>
+    <p><strong>Admin Token:</strong> <span id="adminToken"></span></p>
+
+    <hr>
+
+    <!-- ====== Customer Signup ====== -->
+    <h2>Customer Register</h2>
+    <form id="registerForm">
+        Name: <input name="name"><br>
+        Email: <input name="email"><br>
+        Password: <input name="password" type="password"><br>
+        Confirm Password: <input name="password_confirmation" type="password"><br>
+        Phone: <input name="phone"><br>
+        Address: <input name="address"><br>
+        <button>Register</button>
+    </form>
+
+    <!-- ====== Customer Login ====== -->
+    <h2>Customer Login</h2>
+    <form id="loginCustomerForm">
+        Email: <input name="email"><br>
+        Password: <input name="password" type="password"><br>
+        <button>Login</button>
+    </form>
+
+    <!-- ====== Admin Login ====== -->
+    <h2>Admin Login</h2>
+    <form id="loginAdminForm">
+        Username: <input name="username"><br>
+        Password: <input name="password" type="password"><br>
+        <button>Login</button>
+    </form>
+
+    <hr>
+
+    <!-- Logout Buttons -->
+    <h2>Logout</h2>
+    <button onclick="logout('customer')">Logout Customer</button>
+    <button onclick="logout('admin')">Logout Admin</button>
+
+    <script>
+        //let customerToken = null;
+        //let adminToken = null;
+
+        document.getElementById('customer-register-form').onsubmit = async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            const res = await fetch('/api/customer/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            alert('Registered, Token: ' + result.token);
+            customerToken = result.token;
+        };
+
+        document.getElementById('customer-login-form').onsubmit = async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            const res = await fetch('/api/customer/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            alert('Customer logged in. Token: ' + result.token);
+            customerToken = result.token;
+        };
+
+        document.getElementById('admin-login-form').onsubmit = async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            const res = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            alert('Admin logged in. Token: ' + result.token);
+            adminToken = result.token;
+        };
+
+        async function logout(role) {
+            let token = role === 'customer' ? customerToken : adminToken;
+            if (!token) return alert('Not logged in');
+
+            const res = await fetch(`/api/${role}/logout`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const result = await res.json();
+            alert(result.message);
+            if (role === 'customer') customerToken = null;
+            if (role === 'admin') adminToken = null;
+        }
+    </script>
+
+    <!-- ====== View Menu ====== -->
+    <h2>Menu</h2>
+    <button onclick="getMenu()">Load Menu</button>
+    <pre id="menuList"></pre>
+
+    <!-- ====== Place Order ====== -->
+    <h2>Place Order (Customer)</h2>
+    Menu Item IDs (comma-separated): <input id="orderItems"><br>
+    Quantity (same count, comma-separated): <input id="orderQty"><br>
+    <button onclick="placeOrder()">Place Order</button>
+
+    <!-- ====== View My Orders ====== -->
+    <h2>My Orders</h2>
+    <button onclick="myOrders()">View My Orders</button>
+    <pre id="myOrdersOutput"></pre>
+
+    <hr>
+
+    <!-- ====== Admin: Add Menu Item ====== -->
+    <h2>Add Menu Item (Admin)</h2>
+    Name: <input id="itemName"><br>
+    Price: <input id="itemPrice"><br>
+    Description: <input id="itemDesc"><br>
+    <button onclick="addItem()">Add Item</button>
+
+    <!-- ====== Admin: Delete Menu Item ====== -->
+    <h2>Delete Menu Item (Admin)</h2>
+    Item ID: <input id="deleteId"><br>
+    <button onclick="deleteItem()">Delete</button>
+
+    <!-- ====== Admin: View All Orders ====== -->
+    <h2>View All Orders (Admin)</h2>
+    <button onclick="adminOrders()">Load All Orders</button>
+    <pre id="allOrders"></pre>
+
+    <!-- ====== Admin: Update Order Status ====== -->
+    <h2>Update Order Status (Admin)</h2>
+    Order ID: <input id="statusOrderId"><br>
+    Status: <select id="newStatus">
+        <option value="pending">pending</option>
+        <option value="confirmed">confirmed</option>
+        <option value="delivered">delivered</option>
+    </select><br>
+    <button onclick="updateStatus()">Update Status</button>
+
+    <script>
+        const api = 'http://localhost:8000/api';
+
+        let customerToken = '';
+        let adminToken = '';
+
+        // Helper
+        const headers = (token) => ({
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        });
+
+        // Register
+        document.getElementById('registerForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const form = Object.fromEntries(new FormData(e.target));
+            const res = await fetch(`${api}/customer/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(form)
+            });
+            const data = await res.json();
+            customerToken = data.token;
+            document.getElementById('customerToken').textContent = customerToken;
+            alert('Registered and Logged In!');
+        };
+
+        // Customer Login
+        document.getElementById('loginCustomerForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const form = Object.fromEntries(new FormData(e.target));
+            const res = await fetch(`${api}/customer/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(form)
+            });
+            const data = await res.json();
+            customerToken = data.token;
+            document.getElementById('customerToken').textContent = customerToken;
+            alert('Customer Logged In!');
+        };
+
+        // Admin Login
+        document.getElementById('loginAdminForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const form = Object.fromEntries(new FormData(e.target));
+            const res = await fetch(`${api}/admin/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(form)
+            });
+            const data = await res.json();
+            adminToken = data.token;
+            document.getElementById('adminToken').textContent = adminToken;
+            alert('Admin Logged In!');
+        };
+
+        
+
+
+        // Load Menu
+        async function getMenu() {
+            const res = await fetch(`${api}/menu`);
+            const data = await res.json();
+            document.getElementById('menuList').textContent = JSON.stringify(data, null, 2);
+        }
+
+        // Place Order
+        async function placeOrder() {
+            const ids = document.getElementById('orderItems').value.split(',').map(Number);
+            const qtys = document.getElementById('orderQty').value.split(',').map(Number);
+            const items = ids.map((id, i) => ({ menu_item_id: id, quantity: qtys[i] }));
+            const res = await fetch(`${api}/orders`, {
+                method: 'POST',
+                headers: headers(customerToken),
+                body: JSON.stringify({ items })
+            });
+            alert('Order Placed!');
+        }
+
+        // View My Orders
+        async function myOrders() {
+            const res = await fetch(`${api}/orders`, {
+                headers: headers(customerToken)
+            });
+            const data = await res.json();
+            document.getElementById('myOrdersOutput').textContent = JSON.stringify(data, null, 2);
+        }
+
+        // Add Item
+        async function addItem() {
+            const item = {
+                name: document.getElementById('itemName').value,
+                price: document.getElementById('itemPrice').value,
+                description: document.getElementById('itemDesc').value
+            };
+            await fetch(`${api}/menu`, {
+                method: 'POST',
+                headers: headers(adminToken),
+                body: JSON.stringify(item)
+            });
+            alert('Item Added!');
+        }
+
+        // Delete Item
+        async function deleteItem() {
+            const id = document.getElementById('deleteId').value;
+            await fetch(`${api}/menu/${id}`, {
+                method: 'DELETE',
+                headers: headers(adminToken)
+            });
+            alert('Item Deleted!');
+        }
+
+        // Admin View Orders
+        async function adminOrders() {
+            const res = await fetch(`${api}/admin/orders`, {
+                headers: headers(adminToken)
+            });
+            const data = await res.json();
+            document.getElementById('allOrders').textContent = JSON.stringify(data, null, 2);
+        }
+
+        // Admin Update Status
+        async function updateStatus() {
+            const id = document.getElementById('statusOrderId').value;
+            const status = document.getElementById('newStatus').value;
+            await fetch(`${api}/admin/orders/${id}`, {
+                method: 'PUT',
+                headers: headers(adminToken),
+                body: JSON.stringify({ status })
+            });
+            alert('Order Status Updated!');
+        }
+    </script>
+</body>
+</html>
